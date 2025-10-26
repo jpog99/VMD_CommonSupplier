@@ -3,7 +3,6 @@ import pandas as pd
 from io import BytesIO
 from openpyxl import load_workbook
 from openpyxl.styles import Border, Side, PatternFill
-import time
 # ============================================================
 #                 HELPER FUNCTIONS
 # ============================================================
@@ -28,8 +27,9 @@ def update_cell(df, idx, col, new_val, modified_cells, sheet_name):
         old_val = df.at[idx, col]
         if str(old_val).strip() != str(new_val).strip():
             df.at[idx, col] = new_val
-            modified_cells.add((sheet_name, idx, col))
-
+            if pd.isna(old_val) and new_val == "": pass
+            else: modified_cells.add((sheet_name, idx, col))
+            
 
 def ensure_column(df, target_col):
     """Ensure a column exists, creating it if missing."""
@@ -115,6 +115,9 @@ def process_excel(input_bytes):
                     update_cell(but000, idx, col, "X", modified_cells, "BUT000 - General")
             for col in cols_name:
                 update_cell(but000, idx, col, f"COMMON SUPPLIER {parent_id}", modified_cells, "BUT000 - General")
+
+        else:
+            update_cell(but000, idx, "ZGSTS_CMT_REP_FLG", "X", modified_cells, "BUT000 - General")
 
     sheets["BUT000 - General"] = but000
 
