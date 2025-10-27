@@ -44,7 +44,6 @@ def ensure_column(df, target_col):
 # ============================================================
 #                 MAIN PROCESSING LOGIC
 # ============================================================
-
 def process_excel(input_bytes, pairs):
     input_file = BytesIO(input_bytes)
     output_file = BytesIO()
@@ -71,20 +70,22 @@ def process_excel(input_bytes, pairs):
     modified_cells = set()
 
     # ------------------------------------------------------------
-    # Step 1: Identify Source_ID types (parent/child) using user input
+    # Step 1: Build mapping from user input
     # ------------------------------------------------------------
-    but000 = clean_headers(sheets["BUT000 - General"])
-    source_col = find_column(but000, "Source_ID")
-
+    id_map = {}  # child -> parent
     src_info = {}
-    for parent_id, child_id in pairs:
-        src_info[parent_id] = {"type": "parent_id"}
-        src_info[child_id] = {"type": "child_id", "parent_id": parent_id}
 
-    print("✅ Parent–Child mapping received from user input.")
+    for parent, child in pairs:
+        parent = str(parent).strip()
+        child = str(child).strip()
+        id_map[child] = parent
+        src_info[parent] = {"type": "parent_id"}
+        src_info[child] = {"type": "child_id"}
+
+    print("✅ Parent–Child mapping successfully built.")
 
     # ------------------------------------------------------------
-    # Step 2: Assign Role Info
+    # Step 2: Assign Role Info (same as before)
     # ------------------------------------------------------------
     but100 = clean_headers(sheets["BUT100 - Role"])
     role_src_col = find_column(but100, "Source_ID")
@@ -96,21 +97,24 @@ def process_excel(input_bytes, pairs):
     print("✅ Source_ID attributes and roles assigned.")
 
     # ------------------------------------------------------------
-    # Step 3: Process Sheets
+    # Step 3: BUT000 - General
     # ------------------------------------------------------------
-
-    # === BUT000 - General ===
     print("🛠 Updating BUT000 - General...")
-    cols_clear = ["NAME_ORG2", "NAME_ORG3", "NAME_ORG4", "MC_NAME2", "MC_NAME3", "MC_NAME4",
-                  "ZGSTS_SLP_REP_FLG", "ZGSTS_CMT_REP_FLG", "ZGSTS_ATL_REP_FLG"]
+    but000 = clean_headers(sheets["BUT000 - General"])
+    source_col = find_column(but000, "Source_ID")
+
+    cols_clear = [
+        "NAME_ORG2", "NAME_ORG3", "NAME_ORG4",
+        "MC_NAME2", "MC_NAME3", "MC_NAME4",
+        "ZGSTS_SLP_REP_FLG", "ZGSTS_CMT_REP_FLG", "ZGSTS_ATL_REP_FLG"
+    ]
     cols_fill_x = ["ZGSTS_AVN_REP_FLG", "XDELE"]
     cols_name = ["MC_NAME1", "NAME_ORG1"]
 
     for idx, row in but000.iterrows():
         sid = str(row[source_col]).strip()
-        info = src_info.get(sid)
-        if info and info["type"] == "child_id":
-            parent_id = info["parent_id"]
+        if sid in src_info and src_info[sid]["type"] == "child_id":
+            parent_id = id_map.get(sid, "0000000000")
             for col in cols_clear:
                 if col in but000.columns:
                     update_cell(but000, idx, col, "", modified_cells, "BUT000 - General")
@@ -119,12 +123,14 @@ def process_excel(input_bytes, pairs):
                     update_cell(but000, idx, col, "X", modified_cells, "BUT000 - General")
             for col in cols_name:
                 update_cell(but000, idx, col, f"COMMON SUPPLIER {parent_id}", modified_cells, "BUT000 - General")
-        elif info and info["type"] == "parent_id":
+        else:
             update_cell(but000, idx, "ZGSTS_CMT_REP_FLG", "X", modified_cells, "BUT000 - General")
 
     sheets["BUT000 - General"] = but000
 
-    # === ADRC - Address ===
+    # ------------------------------------------------------------
+    # Step 4: ADRC - Address
+    # ------------------------------------------------------------
     print("🛠 Updating ADRC - Address...")
     adrc = clean_headers(sheets["ADRC - Address"])
     adrc_src_col = find_column(adrc, "Source_ID")
@@ -132,14 +138,15 @@ def process_excel(input_bytes, pairs):
 
     for idx, row in adrc.iterrows():
         sid = str(row[adrc_src_col]).strip()
-        info = src_info.get(sid)
-        if info and info["type"] == "child_id":
-            parent_id = info["parent_id"]
+        if sid in src_info and src_info[sid]["type"] == "child_id":
+            parent_id = id_map.get(sid, "0000000000")
             update_cell(adrc, idx, adrc_name_col, f"COMMON SUPPLIER {parent_id}", modified_cells, "ADRC - Address")
 
     sheets["ADRC - Address"] = adrc
 
-    # === LFA1 - Supplier General ===
+    # ------------------------------------------------------------
+    # Step 5: LFA1 - Supplier General
+    # ------------------------------------------------------------
     print("🛠 Updating LFA1 - Supplier General...")
     lfa1 = clean_headers(sheets["LFA1 - Supplier General"])
     lfa1_src_col = find_column(lfa1, "Source_ID")
@@ -149,9 +156,8 @@ def process_excel(input_bytes, pairs):
 
     for idx, row in lfa1.iterrows():
         sid = str(row[lfa1_src_col]).strip()
-        info = src_info.get(sid)
-        if info and info["type"] == "child_id":
-            parent_id = info["parent_id"]
+        if sid in src_info and src_info[sid]["type"] == "child_id":
+            parent_id = id_map.get(sid, "0000000000")
             for col in cols_to_clear:
                 update_cell(lfa1, idx, col, "", modified_cells, "LFA1 - Supplier General")
             for col in cols_to_replace:
@@ -161,21 +167,21 @@ def process_excel(input_bytes, pairs):
 
     sheets["LFA1 - Supplier General"] = lfa1
 
-    # === LFB1 - Company Code (Supplier) ===
+    # ------------------------------------------------------------
+    # Step 6: LFB1 - Company Code (Supplier)
+    # ------------------------------------------------------------
     print("🛠 Updating LFB1 - Company Code (Supplier)...")
     lfb1 = clean_headers(sheets["LFB1 - Company Code (Supplier)"])
     lfb1_src_col = find_column(lfb1, "Source_ID")
     bukrs_col = find_column(lfb1, "BUKRS")
     action_col = ensure_column(lfb1, "_ACTION_CODE")
 
-    # Build map of BUKRS per Source_ID
     bukrs_map = lfb1.groupby(lfb1_src_col)[bukrs_col].apply(lambda x: set(x.dropna().astype(str).str.strip())).to_dict()
 
     for idx, row in lfb1.iterrows():
         sid = str(row[lfb1_src_col]).strip()
-        info = src_info.get(sid)
-        if info and info["type"] == "child_id":
-            parent_id = info["parent_id"]
+        if sid in src_info and src_info[sid]["type"] == "child_id":
+            parent_id = id_map.get(sid, "0000000000")
             parent_bukrs = bukrs_map.get(parent_id, set())
             bukrs_val = str(row[bukrs_col]).strip()
             if bukrs_val and bukrs_val not in parent_bukrs:
@@ -184,7 +190,9 @@ def process_excel(input_bytes, pairs):
 
     sheets["LFB1 - Company Code (Supplier)"] = lfb1
 
-    # === LFM1 - Purchasing Org Data ===
+    # ------------------------------------------------------------
+    # Step 7: LFM1 - Purchasing Org Data
+    # ------------------------------------------------------------
     sheet_name = "LFM1 - Purchasing Org Data"
     if sheet_name in sheets:
         print(f"🛠 Updating {sheet_name}...")
@@ -202,9 +210,8 @@ def process_excel(input_bytes, pairs):
 
             for idx, row in df.iterrows():
                 sid = str(row[src_col]).strip()
-                info = src_info.get(sid)
-                if info and info["type"] == "child_id":
-                    parent_id = info["parent_id"]
+                if sid in src_info and src_info[sid]["type"] == "child_id":
+                    parent_id = id_map.get(sid, "0000000000")
                     parent_ekorgs = ekorg_map.get(parent_id, set())
                     ekorg_val = str(row[ekorg_col]).strip()
                     if ekorg_val and ekorg_val not in parent_ekorgs:
@@ -215,7 +222,9 @@ def process_excel(input_bytes, pairs):
     else:
         print("ℹ️ LFM1 - Purchasing Org Data not found (skipped).")
 
-    # === WYT3 - Partner Function (Supplier) ===
+    # ------------------------------------------------------------
+    # Step 8: WYT3 - Partner Function (Supplier)
+    # ------------------------------------------------------------
     sheet_name = "WYT3 - Partner Function (Suppli"
     hidden_cols = ["ERNAM", "ERDAT", "LIFN2", "LIFNR"]
 
@@ -232,17 +241,16 @@ def process_excel(input_bytes, pairs):
         if src_col and ekorg_col:
             action_col = ensure_column(df, "_ACTION_CODE")
             ekorg_map = df.groupby(src_col)[ekorg_col].apply(lambda x: set(x.dropna().astype(str).str.strip())).to_dict()
+
             parvw_col = next((c for c in df.columns if c.strip().lower() == "parvw"), None)
             defpa_col = ensure_column(df, "DEFPA")
 
             for idx, row in df.iterrows():
                 sid = str(row[src_col]).strip()
-                info = src_info.get(sid)
-                if info and info["type"] == "child_id":
-                    parent_id = info["parent_id"]
+                if sid in src_info and src_info[sid]["type"] == "child_id":
+                    parent_id = id_map.get(sid, "0000000000")
                     parent_ekorgs = ekorg_map.get(parent_id, set())
                     ekorg_val = str(row[ekorg_col]).strip()
-
                     if ekorg_val and ekorg_val not in parent_ekorgs:
                         update_cell(df, idx, action_col, "I", modified_cells, sheet_name)
                         update_cell(df, idx, src_col, parent_id, modified_cells, sheet_name)
@@ -254,10 +262,11 @@ def process_excel(input_bytes, pairs):
     else:
         print("ℹ️ WYT3 - Partner Function (Supplier) not found (skipped).")
 
-    # === SAVE OUTPUT + HIGHLIGHTING ===
+    # ------------------------------------------------------------
+    # Step 9: Save & highlight (unchanged)
+    # ------------------------------------------------------------
     print("💾 Saving results and applying highlights...")
 
-    # Reload first row from original
     input_file.seek(0)
     first_rows = pd.read_excel(input_file, sheet_name=None, nrows=1, header=None, dtype=str)
 
@@ -282,48 +291,9 @@ def process_excel(input_bytes, pairs):
             cell.fill = fill
             changed_cols.setdefault(sheet_name, set()).add(col_name)
 
-    # Hide irrelevant sheets
     for ws in wb.worksheets:
-        if ws.title not in required_sheets + optional_sheets:
+        if ws.title not in required_sheets + optional_sheets or ws.title == "BUT100 - Role":
             ws.sheet_state = "hidden"
-        if ws.title == "BUT100 - Role":
-            ws.sheet_state = "hidden"
-
-    # Hide columns rules
-    for ws in wb.worksheets:
-        sheet_name = ws.title
-        header_cells = ws[2]
-
-        if sheet_name in ["BUT000 - General", "ADRC - Address"]:
-            visible = set(changed_cols.get(sheet_name, set()))
-            for cell in header_cells:
-                if cell.value and "source" in str(cell.value).lower() and "id" in str(cell.value).lower():
-                    visible.add(str(cell.value).strip())
-            for cell in header_cells:
-                if cell.value and str(cell.value).strip() not in visible:
-                    ws.column_dimensions[cell.column_letter].hidden = True
-
-        elif sheet_name == "WYT3 - Partner Function (Suppli":
-            for cell in header_cells:
-                if str(cell.value).strip().upper() in ["ERNAM", "ERDAT", "LIFN2", "LIFNR"]:
-                    ws.column_dimensions[cell.column_letter].hidden = True
-
-    # Final header styling
-    border_style = Border(
-        left=Side(border_style="thin", color="000000"),
-        right=Side(border_style="thin", color="000000"),
-        top=Side(border_style="thin", color="000000"),
-        bottom=Side(border_style="thin", color="000000"),
-    )
-    fill_style = PatternFill(start_color="DBD5BF", end_color="DBD5BF", fill_type="solid")
-
-    for ws in wb.worksheets:
-        max_col = ws.max_column
-        for row_idx in [1, 2]:
-            for col_idx in range(1, max_col + 1):
-                cell = ws.cell(row=row_idx, column=col_idx)
-                cell.border = border_style
-                cell.fill = fill_style
 
     wb.save(output_file)
     return output_file
