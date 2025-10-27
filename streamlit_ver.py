@@ -301,6 +301,10 @@ def process_excel(input_bytes):
     for ws in wb.worksheets:
         if ws.title not in required_sheets + optional_sheets:
             ws.sheet_state = "hidden"
+            
+    for ws in wb.worksheets:
+        if ws.title == "BUT100 - Role":
+            ws.sheet_state = "hidden"
 
     # Hide columns except Source_ID + changed ones
     # === Hide columns based on specific rules ===
@@ -364,7 +368,7 @@ def process_excel(input_bytes):
 
 st.set_page_config(page_title="Excel Vendor Processor", page_icon="📊", layout="centered")
 
-st.title("📊 Common SUpplier Upload File")
+st.title("📊 Common Supplier Upload File")
 st.write("Input the pre-file from Fiori and generate the Upload file.")
 
 uploaded = st.file_uploader("📂 Upload Pre file (.xlsx)", type=["xlsx"])
