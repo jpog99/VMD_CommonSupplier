@@ -294,6 +294,58 @@ def process_excel(input_bytes, pairs):
     for ws in wb.worksheets:
         if ws.title not in required_sheets + optional_sheets or ws.title == "BUT100 - Role":
             ws.sheet_state = "hidden"
+            
+    # Hide columns except Source_ID + changed ones
+    # === Hide columns based on specific rules ===
+    for ws in wb.worksheets:
+        sheet_name = ws.title
+        header_cells = ws[2]
+
+        # Rule 1️⃣: For "BUT000 - General" and "ADRC - Address"
+        if sheet_name in ["BUT000 - General", "ADRC - Address"]:
+            visible = set(changed_cols.get(sheet_name, set()))
+
+            # Always include "Source_ID" column
+            for cell in header_cells:
+                if cell.value and "source" in str(cell.value).lower() and "id" in str(cell.value).lower():
+                    visible.add(str(cell.value).strip())
+
+            # Hide all columns not in visible set
+            for cell in header_cells:
+                if cell.value and str(cell.value).strip() not in visible:
+                    ws.column_dimensions[cell.column_letter].hidden = True
+
+        # Rule 2️⃣: For "WYT3 - Partner Function (Suppli)"
+        elif sheet_name == "WYT3 - Partner Function (Suppli":
+            for cell in header_cells:
+                if str(cell.value).strip().upper() in ["ERNAM", "ERDAT", "LIFN2", "LIFNR"]:
+                    ws.column_dimensions[cell.column_letter].hidden = True
+
+        # Rule 3️⃣: For all other sheets (LFA1, LFB1, LFM1, etc.) — show all columns
+        else:
+            for cell in header_cells:
+                if cell.value:
+                    ws.column_dimensions[cell.column_letter].hidden = False
+            
+        # ------------------------------------------------------------
+    # Step 11: Final styling for row 1 and row 2
+    # ------------------------------------------------------------
+    border_style = Border(
+        left=Side(border_style="thin", color="000000"),
+        right=Side(border_style="thin", color="000000"),
+        top=Side(border_style="thin", color="000000"),
+        bottom=Side(border_style="thin", color="000000")
+    )
+    fill_style = PatternFill(start_color="DBD5BF", end_color="DBD5BF", fill_type="solid")
+
+    for ws in wb.worksheets:
+        max_col = ws.max_column
+        # Apply to row 1 and 2
+        for row_idx in [1, 2]:
+            for col_idx in range(1, max_col + 1):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.border = border_style
+                cell.fill = fill_style
 
     wb.save(output_file)
     return output_file
