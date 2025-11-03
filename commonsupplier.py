@@ -369,8 +369,8 @@ num_pairs = st.number_input("How many parent–child pairs?", min_value=1, max_v
 pairs = []
 for i in range(int(num_pairs)):
     cols = st.columns(2)
-    parent_id = cols[0].text_input(f"Parent ID #{i+1}")
-    child_id = cols[1].text_input(f"Child ID #{i+1}")
+    parent_id = cols[0].text_input(f"Parent ID #{i+1} (10 digits inc. leading zero)" )
+    child_id = cols[1].text_input(f"Child ID #{i+1} (10 digits inc. leading zero)")
     if parent_id and child_id:
         pairs.append((parent_id.strip(), child_id.strip()))
 
@@ -395,10 +395,10 @@ if uploaded:
             if not (len(child_id) == 10 and child_id.isdigit()):
                 errors.append(f"❌ Pair #{i}: Child ID '{child_id}' must be exactly 10 digits.")
 
-        # --- Check 2: Parent 4th char = '3'
-        for i, (parent_id, _) in enumerate(pairs, 1):
-            if len(parent_id) == 10 and parent_id[3] != "3":
-                errors.append(f"❌ Pair #{i}: Parent ID '{parent_id}' must have '3' as the 4th character.")
+        # --- Check 2: Parent 4th char = '3' (DELETED BECAUSE PARENT ID IS NOT NECESSARILY MUST BE ATLAS CODE)
+        #for i, (parent_id, _) in enumerate(pairs, 1):
+        #    if len(parent_id) == 10 and parent_id[3] != "3":
+        #        errors.append(f"❌ Pair #{i}: Parent ID '{parent_id}' must have '3' as the 4th character.")
 
         # --- Check 3: Existence in file
         for i, (parent_id, child_id) in enumerate(pairs, 1):
