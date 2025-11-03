@@ -125,6 +125,7 @@ def process_excel(input_bytes, pairs):
                 update_cell(but000, idx, col, f"COMMON SUPPLIER {parent_id}", modified_cells, "BUT000 - General")
         else:
             update_cell(but000, idx, "ZGSTS_CMT_REP_FLG", "X", modified_cells, "BUT000 - General")
+            update_cell(but000, idx, "ZGSTS_ATL_REP_FLG", "X", modified_cells, "BUT000 - General")
 
     sheets["BUT000 - General"] = but000
 
@@ -432,5 +433,6 @@ if uploaded:
         st.error(f"❌ Failed to read Excel file or Source_ID column: {e}")
 else:
     st.info("ℹ️ Please provide both the parent–child pairs and upload a file to proceed.")
+
 
 
