@@ -135,13 +135,14 @@ def process_excel(input_bytes, pairs):
     print("🛠 Updating ADRC - Address...")
     adrc = clean_headers(sheets["ADRC - Address"])
     adrc_src_col = find_column(adrc, "Source_ID")
-    adrc_name_col = find_column(adrc, "Name1")
+    adrc_name_col = find_column(adrc, "NAME1")
 
     for idx, row in adrc.iterrows():
         sid = str(row[adrc_src_col]).strip()
         if sid in src_info and src_info[sid]["type"] == "child_id":
             parent_id = id_map.get(sid, "0000000000")
             update_cell(adrc, idx, adrc_name_col, f"COMMON SUPPLIER {parent_id}", modified_cells, "ADRC - Address")
+            update_cell(adrc, idx, "NAME2", "", modified_cells, "ADRC - Address")
 
     sheets["ADRC - Address"] = adrc
 
@@ -303,7 +304,7 @@ def process_excel(input_bytes, pairs):
         header_cells = ws[2]
 
         # Rule 1️⃣: For "BUT000 - General" and "ADRC - Address"
-        if sheet_name in ["BUT000 - General", "ADRC - Address"]:
+        if sheet_name in ["BUT000 - General"]:
             visible = set(changed_cols.get(sheet_name, set()))
 
             # Always include "Source_ID" column
@@ -433,6 +434,7 @@ if uploaded:
         st.error(f"❌ Failed to read Excel file or Source_ID column: {e}")
 else:
     st.info("ℹ️ Please provide both the parent–child pairs and upload a file to proceed.")
+
 
 
 
